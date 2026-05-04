@@ -43,7 +43,7 @@ async function run() {
             path: urlObj.pathname + urlObj.search,
             method: 'POST',
             headers: {
-                'Content-Type:': 'application/json',
+                'Content-Type': 'application/json',
                 'Content-Length': Buffer.byteLength(data)
             }
         };
