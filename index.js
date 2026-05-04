@@ -19,7 +19,7 @@ async function run() {
                 return {
                     short: true,
                     title: title.trim(),
-                    value: `[${title.trim()}](${link.trim()})`
+                    value: `[Открыть](${link.trim()})`
                 };
             });
 
