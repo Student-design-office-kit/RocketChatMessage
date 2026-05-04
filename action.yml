@@ -1,0 +1,22 @@
+name: 'RocketChat Node Notifier'
+description: 'Отправка уведомлений в RocketChat'
+inputs:
+  url:
+    required: true
+  text:
+    required: true
+  alias:
+    default: 'Gitea Bot'
+    required: false
+  avatar:
+    default: 'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/gitea.svg'
+    required: false
+  color:
+    default: '#00ff00'
+    required: false
+  links:
+    required: false
+
+runs:
+  using: 'node20'
+  main: 'index.js'
