@@ -1,42 +1,53 @@
 const https = require('https');
+const TEMPLATES = require('./templates');
+
+function parseInputList(rawInput) {
+    const result = {};
+    if (!rawInput) return result;
+    rawInput.split('\n').forEach(line => {
+        const trimmed = line.trim();
+        if (trimmed && trimmed.includes('|')) {
+            const [key, ...valueParts] = trimmed.split('|');
+            result[key.trim()] = valueParts.join('|').trim();
+        }
+    });
+    return result;
+}
 
 async function run() {
     try {
-        // Получаем входные данные из переменных окружения (Gitea передает их так)
-        const url = process.env.INPUT_URL;
-        const text = process.env.INPUT_TEXT;
-        const alias = process.env.INPUT_ALIAS;
-        const avatar = process.env.INPUT_AVATAR;
-        const color = process.env.INPUT_COLOR;
-        const linksRaw = process.env.INPUT_LINKS || "";
+        const {
+            INPUT_URL: url,
+            INPUT_TEMPLATE: templateName = 'custom',
+            INPUT_TEXT: defaultText = '',
+            INPUT_PARAMS: rawParams = '',
+            INPUT_LINKS: rawLinks = '',
+            INPUT_ALIAS: alias = 'Gitea Bot',
+            INPUT_AVATAR: avatar,
+            INPUT_COLOR: color = '#00ff00'
+        } = process.env;
 
-        // Парсим ссылки из формата "Название|URL"
-        const fields = linksRaw
-            .split('\n')
-            .filter(line => line.trim() !== "" && line.includes('|'))
-            .map(line => {
-                const [title, link] = line.split('|');
-                return {
-                    short: true,
-                    title: title.trim(),
-                    value: `[Открыть](${link.trim()})`
-                };
-            });
+        if (!url) throw new Error("URL is required");
 
-        // Формируем объект сообщения
-        const payload = {
-            alias: alias,
-            avatar: avatar,
-            text: text,
-            attachments: [{
-                color: color,
-                fields: fields
-            }]
-        };
+        const params = parseInputList(rawParams);
+        const links = parseInputList(rawLinks);
 
-        const data = JSON.stringify(payload);
+        const templateFn = TEMPLATES[templateName] || TEMPLATES['custom'];
+        const messageText = templateFn(params, defaultText);
 
-        // Настройки HTTP-запроса
+        const fields = Object.entries(links).map(([title, link]) => ({
+            short: true,
+            title: title,
+            value: `[Открыть](${link})`
+        }));
+
+        const payload = JSON.stringify({
+            alias,
+            avatar,
+            text: messageText,
+            attachments: [{ color, fields }]
+        });
+
         const urlObj = new URL(url);
         const options = {
             hostname: urlObj.hostname,
@@ -44,26 +55,39 @@ async function run() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Content-Length': Buffer.byteLength(data)
+                'Content-Length': Buffer.byteLength(payload)
             }
         };
 
-        // Отправка
-        const req = https.request(options, (res) => {
-            console.log(`Status: ${res.statusCode}`);
-            res.on('data', d => process.stdout.write(d));
+        await new Promise((resolve, reject) => {
+            const req = https.request(options, (res) => {
+                let chunks = '';
+                res.on('data', (chunk) => chunks += chunk);
+                res.on('end', () => {
+                    console.log(`Status: ${res.statusCode}`);
+                    if (res.statusCode >= 400) {
+                        reject(new Error(`Server returned status ${res.statusCode}: ${chunks}`));
+                    } else {
+                        resolve();
+                    }
+                });
+            });
+
+            req.on('error', (e) => reject(e));
+            req.on('timeout', () => {
+                req.destroy();
+                reject(new Error('Request timed out'));
+            });
+
+            req.write(payload);
+            req.end();
         });
 
-        req.on('error', (e) => {
-            console.error(`Error: ${e.message}`);
-            process.exit(1);
-        });
-
-        req.write(data);
-        req.end();
+        console.log("Уведомление успешно отправлено.");
+        process.exit(0); 
 
     } catch (error) {
-        console.error(error.message);
+        console.error("Ошибка:", error.message);
         process.exit(1);
     }
 }
