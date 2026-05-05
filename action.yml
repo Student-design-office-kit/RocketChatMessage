@@ -3,8 +3,15 @@ description: 'Отправка уведомлений в RocketChat'
 inputs:
   url:
     required: true
+  template:
+    required: false
+    default: 'custom'
+    description: 'deploy_success, audit_error, custom'
   text:
-    required: true
+    required: false
+  params:
+    required: false
+    description: 'Параметры в формате КЛЮЧ|ЗНАЧЕНИЕ'
   alias:
     default: 'Gitea Bot'
     required: false
